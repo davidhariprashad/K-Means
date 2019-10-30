@@ -13,12 +13,12 @@
 constexpr double MIN = -100.0;
 constexpr double MAX = 100.0;
 
-std::vector<std::pair<double, double>> read_file(const char * filename);
-std::vector<size_t> k_means(std::vector<std::pair<double, double>> & points, const int k);
-double distance(std::pair<double, double>& a, std::pair<double, double>& b);
-template <typename T> std::pair<T, T>& operator+=(std::pair<T, T>& lhs, const std::pair<T, T>& rhs);
-template <typename T, typename U> std::pair<T, T>& operator/=(std::pair<T, T>& lhs, const U rhs);
-void write_file(const char* filename, const std::vector<std::pair<double, double>>& points, const std::vector<size_t> points_clusters);
+std::vector<std::pair<double, double>> read_file(const char *);
+std::vector<size_t> k_means(std::vector<std::pair<double, double>> &, const int);
+double distance(std::pair<double, double> &, std::pair<double, double> &);
+template <typename T> std::pair<T, T> & operator+=(std::pair<T, T> &, const std::pair<T, T> &);
+template <typename T, typename U> std::pair<T, T> & operator/=(std::pair<T, T> &, const U);
+void write_file(const char *, const std::vector<std::pair<double, double>> &, const std::vector<size_t> &);
 
 int main(int argc, char** argv)
 {
@@ -50,9 +50,7 @@ std::vector<std::pair<double, double>> read_file(const char * input_filename)
 	return points;
 }
 
-std::vector<size_t> k_means(
-	std::vector<std::pair<double, double>> & points,
-	const int k)
+std::vector<size_t> k_means(std::vector<std::pair<double, double>> & points, const int k)
 {
 	typedef std::pair<double, double> Point;
 
@@ -136,9 +134,7 @@ std::vector<size_t> k_means(
 	return points_clusters;
 }
 
-double distance(
-	std::pair<double, double>& a,
-	std::pair<double, double>& b)
+double distance(std::pair<double, double> & a, std::pair<double, double> & b)
 {
 	return std::sqrt(std::pow(a.first - b.first, 2.0) + std::pow(a.second - b.second, 2));
 }
@@ -161,8 +157,8 @@ std::pair<T, T> & operator/=(std::pair<T, T>& lhs, const U rhs)
 
 void write_file(
 	const char* filename,
-	const std::vector<std::pair<double, double>>& points,
-	const std::vector<size_t> points_clusters)
+	const std::vector<std::pair<double, double>> & points,
+	const std::vector<size_t> & points_clusters)
 {
 	std::ofstream ofs(filename);
 	for (size_t point = 0U; point < points.size(); ++point)

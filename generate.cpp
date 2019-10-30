@@ -5,7 +5,7 @@
 
 constexpr double PI = 3.14159265358979323846;
 constexpr double RADIUS = 75.0;
-constexpr int N = 1000;
+constexpr int N = 1000000;
 
 int main()
 {
