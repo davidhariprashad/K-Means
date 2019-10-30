@@ -10,15 +10,20 @@
 #include <cassert>
 #include <limits>
 
-constexpr double MIN = -100.0;
-constexpr double MAX = 100.0;
+typedef std::pair<double, double> Point;
 
-std::vector<std::pair<double, double>> read_file(const char *);
-std::vector<size_t> k_means(std::vector<std::pair<double, double>> &, const int);
-double distance(std::pair<double, double> &, std::pair<double, double> &);
+std::vector<Point> read_file(const char *);
+
+std::vector<size_t> k_means(std::vector<Point> &, const int);
+double distance(const Point &, const Point &);
+void initialize_centroids(std::vector<Point> &);
+void initialize_clusters(const std::vector<Point> &, std::vector<size_t> &, const std::vector<Point> &, std::vector<size_t> &);
+void calculate_centroids(const std::vector<Point> &, const std::vector<size_t> &, std::vector<Point> &, const std::vector<size_t> &);
+int assign_clusters(const std::vector<Point> &, std::vector<size_t> &, const std::vector<Point> &, std::vector<size_t> &);
+
 template <typename T> std::pair<T, T> & operator+=(std::pair<T, T> &, const std::pair<T, T> &);
 template <typename T, typename U> std::pair<T, T> & operator/=(std::pair<T, T> &, const U);
-void write_file(const char *, const std::vector<std::pair<double, double>> &, const std::vector<size_t> &);
+void write_file(const char *, const std::vector<Point> &, const std::vector<size_t> &);
 
 int main(int argc, char** argv)
 {
@@ -38,34 +43,58 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-std::vector<std::pair<double, double>> read_file(const char * input_filename)
+std::vector<Point> read_file(const char * input_filename)
 {
-	std::vector<std::pair<double, double>> points;
+	std::vector<Point> points;
 	std::ifstream ifs(input_filename);
 	double x, y; char comma;
 	while (ifs >> x >> comma >> y)
 	{
-		points.push_back(std::pair<double, double>(x, y));
+		points.push_back(Point(x, y));
 	}
 	return points;
 }
 
-std::vector<size_t> k_means(std::vector<std::pair<double, double>> & points, const int k)
+std::vector<size_t> k_means(std::vector<Point> & points, const int k)
 {
-	typedef std::pair<double, double> Point;
-
-	// randomly assign centroids value
 	std::vector<Point> centroids(k);
-	{
-		std::mt19937 engine(std::random_device{}());
-		std::uniform_real_distribution<double> distribution(MIN, MAX);
-		for (auto& centroid : centroids)
-			centroid = Point(distribution(engine), distribution(engine));
-	}
-
-	// assign cluster for each point
 	std::vector<size_t> points_clusters(points.size());
 	std::vector<size_t> clusters_sizes(k);
+
+	initialize_centroids(centroids);
+	initialize_clusters(points, points_clusters, centroids, clusters_sizes);
+
+	int changes;
+	do
+	{
+		calculate_centroids(points, points_clusters, centroids, clusters_sizes);
+		changes = assign_clusters(points, points_clusters, centroids, clusters_sizes);
+		std::cout << "changes: " << changes << '\n';
+	} while (changes > 0);
+
+	std::cout << "Centroids:\n";
+	for (auto& centroid : centroids)
+		std::cout << centroid.first << ',' << centroid.second << '\n';
+
+	return points_clusters;
+}
+
+void initialize_centroids(std::vector<Point> & centroids)
+{
+	constexpr double MIN = -100.0;
+	constexpr double MAX = 100.0;
+	std::mt19937 engine(std::random_device{}());
+	std::uniform_real_distribution<double> distribution(MIN, MAX);
+	for (auto& centroid : centroids)
+		centroid = Point(distribution(engine), distribution(engine));
+}
+
+void initialize_clusters(
+	const std::vector<Point> & points,
+	std::vector<size_t> & points_clusters,
+	const std::vector<Point> & centroids,
+	std::vector<size_t> & clusters_sizes)
+{
 	std::fill(clusters_sizes.begin(), clusters_sizes.end(), 0U);
 	for (size_t point = 0U; point < points.size(); ++point)
 	{
@@ -83,58 +112,57 @@ std::vector<size_t> k_means(std::vector<std::pair<double, double>> & points, con
 		points_clusters[point] = closest_centroid;
 		++clusters_sizes[closest_centroid];
 	}
-
-	// do while change, recalculate centroids and reassign points to clusters
-	int changes;
-	do
-	{
-		changes = 0;
-
-		// recalculate centroids
-		for (auto& centroid : centroids)
-			centroid = {0.0, 0.0};
-
-		for (size_t point = 0U; point < points.size(); ++point)
-			centroids[points_clusters[point]] += {points[point].first, points[point].second};
-
-		for (size_t centroid = 0U; centroid < centroids.size(); ++centroid)
-			if (clusters_sizes[centroid] != 0U)
-				centroids[centroid] /= clusters_sizes[centroid];
-
-		// reassign points to clusters
-		for (size_t point = 0U; point < points.size(); ++point)
-		{
-			double minimum_distance = distance(points[point], centroids[0]);
-			size_t closest_centroid = 0U;
-			for (size_t centroid = 1U; centroid < centroids.size(); ++centroid)
-			{
-				double d = distance(points[point], centroids[centroid]);
-				if (d < minimum_distance)
-				{
-					minimum_distance = d;
-					closest_centroid = centroid;
-				}
-			}
-			if (points_clusters[point] != closest_centroid)
-			{
-				++changes;
-				++clusters_sizes[closest_centroid];
-				--clusters_sizes[points_clusters[point]];
-				points_clusters[point] = closest_centroid;
-			}
-		}
-
-		std::cout << "changes: " << changes << '\n';
-	} while (changes > 0);
-
-	std::cout << "Centroids:\n";
-	for (auto& centroid : centroids)
-		std::cout << centroid.first << ',' << centroid.second << '\n';
-
-	return points_clusters;
 }
 
-double distance(std::pair<double, double> & a, std::pair<double, double> & b)
+void calculate_centroids(
+	const std::vector<Point> & points,
+	const std::vector<size_t> & points_clusters,
+	std::vector<Point> & centroids,
+	const std::vector<size_t> & clusters_sizes)
+{
+	for (auto& centroid : centroids)
+		centroid = {0.0, 0.0};
+
+	for (size_t point = 0U; point < points.size(); ++point)
+		centroids[points_clusters[point]] += {points[point].first, points[point].second};
+
+	for (size_t centroid = 0U; centroid < centroids.size(); ++centroid)
+		if (clusters_sizes[centroid] != 0U)
+			centroids[centroid] /= clusters_sizes[centroid];
+}
+
+int assign_clusters(
+	const std::vector<Point> & points,
+	std::vector<size_t> & points_clusters,
+	const std::vector<Point> & centroids,
+	std::vector<size_t> & clusters_sizes)
+{
+	int changes = 0;
+	for (size_t point = 0U; point < points.size(); ++point)
+	{
+		double minimum_distance = distance(points[point], centroids[0]);
+		size_t closest_centroid = 0U;
+		for (size_t centroid = 1U; centroid < centroids.size(); ++centroid)
+		{
+			double d = distance(points[point], centroids[centroid]);
+			if (d < minimum_distance)
+			{
+				minimum_distance = d;
+				closest_centroid = centroid;
+			}
+		}
+		if (points_clusters[point] != closest_centroid)
+		{
+			++changes;
+			++clusters_sizes[closest_centroid];
+			--clusters_sizes[points_clusters[point]];
+			points_clusters[point] = closest_centroid;
+		}
+	}
+	return changes;
+}
+
+double distance(const Point & a, const Point & b)
 {
 	return std::sqrt(std::pow(a.first - b.first, 2.0) + std::pow(a.second - b.second, 2));
 }
@@ -157,7 +185,7 @@ std::pair<T, T> & operator/=(std::pair<T, T>& lhs, const U rhs)
 
 void write_file(
 	const char* filename,
-	const std::vector<std::pair<double, double>> & points,
+	const std::vector<Point> & points,
 	const std::vector<size_t> & points_clusters)
 {
 	std::ofstream ofs(filename);
