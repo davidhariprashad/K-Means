@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 {
 	if (argc != 4)
 	{
-		std::cerr << "<input filename> <k> <output filename>\n";
+		std::cerr << "<input-filename> <k> <output-filename>\n";
 		return 1;
 	}
 
