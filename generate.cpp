@@ -6,7 +6,7 @@
 #include <cassert>
 
 constexpr double PI = 3.14159265358979323846;
-constexpr double RADIUS = 75.0;
+constexpr double RADIUS = 25.0;
 
 int main(int argc, char * argv[])
 {
